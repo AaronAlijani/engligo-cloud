@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: engligo
-          image: ghcr.io/aaronalijani/engligo:latest
+          image: ghcr.io/aaronalijani/engligo-cloud:latest
           imagePullPolicy: Always
           ports:
             - name: http
