@@ -1,0 +1,35 @@
+{
+  "name": "engligo",
+  "version": "2.0.0",
+  "description": "EngliGo - English learning web platform (cloud-native edition for SIT737 Capstone)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "init-db": "node database_init.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "sqlite",
+    "ejs",
+    "cloud-native",
+    "kubernetes"
+  ],
+  "author": "Aaron Alijani",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

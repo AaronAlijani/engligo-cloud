@@ -1,0 +1,41 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+
+
+}
+/* Make sure html takes full height */
+html {
+    height: 100%;
+    
+}
+/*determine the font of page*/
+body {
+    font-family: "Roboto", sans-serif;
+}
+
+/*Navbar styles*/
+/*change logo style*/
+#logo {
+    width: 150px;
+    height: 100px;
+    padding: 3px;
+    margin-left: 10px;
+}
+
+
+
+
+/*change the style of First image of site ( Hero )*/
+.heroImage {
+    position: relative;
+    padding-bottom: 250px;
+    background-color: white;
+}
+
+
+
+footer {
+    position: relative;
+}

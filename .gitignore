@@ -1,0 +1,27 @@
+node_modules/
+*.log
+npm-debug.log*
+
+# Local database files - schema lives in database_init.js
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Local data dir for development
+local-data/
+
+# Environment variables - never commit secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build artefacts
+dist/
+build/

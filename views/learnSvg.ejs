@@ -1,0 +1,467 @@
+<%- include('header', { pageTitle: 'Learn About SVG Waves - EngliGo' }) %>
+
+    <main class="container mt-5 mb-5">
+        <h1>Understanding and Creating SVG Waves</h1>
+        <hr>
+
+        <p>This page will explain what SVGs are, how they are structured, how the wave effects on the EngliGo homepage
+            are achieved, and guide you through creating your own from scratch!</p>
+
+        <!--Source : https://www.w3schools.com/graphics/svg_intro.asp-->
+        <section id="what-is-svg" class="mt-4">
+            <h2>1. What is SVG?</h2>
+            <p>SVG stands for <strong>Scalable Vector Graphics</strong>. It's an XML-based markup language for
+                describing two-dimensional vector graphics. Unlike bitmap graphics (like JPEGs or PNGs) which are made
+                up of a fixed set of pixels, SVGs define images using mathematical descriptions of shapes, paths, text,
+                and filter effects.</p>
+
+            <h4>Key Characteristics of SVG:</h4>
+            <ul>
+                <li><strong>XML-Based:</strong> SVG code is written in XML, making it human-readable and
+                    machine-parsable. You can write and edit SVGs with a text editor.</li>
+                <li><strong>Vector:</strong> Because they are vector-based, SVGs are resolution-independent. This means
+                    they can be scaled up or down to any size without losing quality or becoming pixelated. This is
+                    perfect for responsive web design where graphics need to look good on any screen.</li>
+                <li><strong>Scalable:</strong> As the name suggests, they scale beautifully.</li>
+                <li><strong>Stylable and Scriptable:</strong> SVGs can be styled with CSS and manipulated with
+                    JavaScript, allowing for interactivity and animations.</li>
+                <li><strong>Text-Based and Searchable:</strong> Since it's XML, the text content within SVGs is real
+                    text, which is good for accessibility and SEO. The files can also be smaller than comparable bitmap
+                    images for simple graphics.</li>
+                <li><strong>W3C Standard:</strong> SVG is an open standard developed by the World Wide Web Consortium
+                    (W3C).</li>
+            </ul>
+
+            <h4>Common Uses:</h4>
+            <p>SVGs are widely used for:
+            <ul>
+                <li>Logos and icons (that need to scale across different sizes).</li>
+                <li>Illustrations and diagrams.</li>
+                <li>Interactive data visualizations and charts.</li>
+                <li>Animations (both simple and complex).</li>
+                <li>Special effects and filters.</li>
+                <li>Decorative page elements, like the wave dividers on the EngliGo homepage!</li>
+            </ul>
+            </p>
+
+            <div id="homepage-wave-example" class="mt-4">
+                <h4>Example: A Wave from Our Homepage</h4>
+                <p>Here’s one of the wave SVGs (<code>visual1</code>) used on the EngliGo homepage, which we'll be
+                    examining in more detail:</p>
+                <div class="my-3 p-3 border bg-light text-center">
+                    <svg id="visual1-rendered-example" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"
+                        xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="xMidYMid meet"
+                        style="width: 100%; max-width: 600px; height: auto; display: inline-block; vertical-align: middle; background-color: #f0f8ff; border: 1px dashed #ccc;">
+                        <path
+                            d="M0 508L30 505.5C60 503 120 498 180 487.3C240 476.7 300 460.3 360 463.3C420 466.3 480 488.7 540 488.8C600 489 660 467 720 466.2C780 465.3 840 485.7 870 495.8L900 506L900 601L870 601C840 601 780 601 720 601C660 601 600 601 540 601C480 601 420 601 360 601C300 601 240 601 180 601C120 601 60 601 30 601L0 601Z"
+                            fill="rgb(191, 236, 255)" stroke-linecap="round" stroke-linejoin="miter"></path>
+                    </svg>
+                    <p class="mt-2"><small>The light blue area with a dashed border shows the SVG's viewBox
+                            area.</small></p>
+                </div>
+            </div>
+        </section>
+        <section id="svg-element-attributes" class="mt-5">
+            <h2>2. The <code>&lt;svg&gt;</code> Element and Its Attributes</h2>
+            <p>The root element of any SVG image is the <code>&lt;svg&gt;</code> tag. Let's look at the attributes
+                typically found on this tag, using the code structure of the homepage wave (<code>visual1</code>) we
+                just saw as an example of how these attributes are set:</p>
+            <pre><code class="language-html">
+&lt;svg id="visual1"
+     viewBox="0 0 900 600"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     version="1.1"
+     preserveAspectRatio="none"
+     class="svg-divider"&gt;
+  &lt;!-- The &lt;path&gt; element goes here --&gt;
+&lt;/svg&gt;
+            </code></pre>
+
+            <h4>Key <code>&lt;svg&gt;</code> Attributes Explained:</h4>
+            <ul>
+                <li><strong><code>id</code></strong>: (example : <code>"visual1"</code>) A unique identifier for the SVG
+                    element.</li>
+                <li><strong><code>class</code></strong>: (example : <code>"svg-divider"</code>) A CSS class for styling.
+                </li>
+                <li><strong><code>xmlns="http://www.w3.org/2000/svg"</code></strong>: The XML namespace, crucial for
+                    browsers to interpret the elements as SVG.</li>
+                <li><strong><code>xmlns:xlink="http://www.w3.org/1999/xlink"</code></strong>: Namespace for XLink, used
+                    for features like <code>&lt;use href="..."&gt;</code>.</li>
+                <li><strong><code>version="1.1"</code></strong>: Specifies the SVG version.</li>
+                <li><strong><code>viewBox="min-x min-y width height"</code></strong>: (Example :
+                    <code>"0 0 900 600"</code>) Defines the SVG's internal coordinate system and aspect ratio. All
+                    coordinates for shapes inside are relative to this. It allows the SVG to scale.</li>
+                <li><strong><code>preserveAspectRatio="alignment [meet|slice|none]"</code></strong>: (example :
+                    <code>"none"</code>) Controls scaling behavior if the <code>viewBox</code> aspect ratio doesn't
+                    match the rendered element's aspect ratio. <code>"none"</code> will stretch to fit.
+                    <code>"xMidYMid meet"</code> (default) scales to fit while preserving aspect ratio, potentially
+                    leaving empty space.</li>
+                <li><strong><code>width</code> & <code>height</code></strong> (attributes on the
+                    <code>&lt;svg&gt;</code> tag itself): Define the actual size the SVG element will take up on the web
+                    page. If omitted (like `visual1` example code snippet above), CSS sizing often determines this.</li>
+            </ul>
+        </section>
+
+        <section id="deconstructing-path-element" class="mt-5">
+            <h2>3. Deconstructing the <code>&lt;path&gt;</code> of Our Homepage Wave</h2>
+            <p>The most visually significant part of the <code>visual1</code> SVG (shown earlier) is its
+                <code>&lt;path&gt;</code> element. This element defines the actual shape of the wave. Let's look at its
+                code again:</p>
+            <pre><code class="language-html">
+&lt;path
+    d="M0 508L30 505.5C60 503 120 498 180 487.3C240 476.7 300 460.3 360 463.3C420 466.3 480 488.7 540 488.8C600 489 660 467 720 466.2C780 465.3 840 485.7 870 495.8L900 506L900 601L870 601C840 601 780 601 720 601C660 601 600 601 540 601C480 601 420 601 360 601C300 601 240 601 180 601C120 601 60 601 30 601L0 601Z"
+    fill="rgb(191, 236, 255)" 
+    stroke-linecap="round" 
+    stroke-linejoin="miter"&gt;
+&lt;/path&gt;
+            </code></pre>
+            <h4>Key <code>&lt;path&gt;</code> Attributes:</h4>
+            <ul>
+                <li><strong><code>fill="rgb(191, 236, 255)"</code></strong>: Sets the fill color of the shape.</li>
+                <li><strong><code>stroke-linecap</code></strong> and <strong><code>stroke-linejoin</code></strong>:
+                    These attributes define the appearance of line endings and corners if a stroke were applied. Since
+                    no explicit <code>stroke</code> color is defined, these likely have no visible effect in this
+                    specific example.</li>
+                <li><strong>The <code>d</code> attribute (Path Data)</strong>: This is the core of the shape. It's a
+                    series of commands and coordinates that tell the SVG renderer how to draw the line. We will explore
+                    these commands (M, L, C, Z etc.) in detail in the "Creating an SVG Wave from Scratch" section.</li>
+                <li>I used SVG Generator Sites like Haikei website to generate me a prepared svg for website but will
+                    explain how to create it from scratch here.</li>
+            </ul>
+        </section>
+
+        <section id="creating-from-scratch" class="mt-5">
+            <h2>4. Creating an SVG Wave from Scratch</h2>
+            <p>Now that we've seen an example and understand the basic structure of an SVG and its
+                <code>&lt;path&gt;</code> element (especially the <code>d</code> attribute from Section 3), let's learn
+                the fundamental path commands. These commands are the building blocks for constructing virtually any
+                shape, including the smooth, flowing lines of our waves.</p>
+
+            <h4 class="mt-4">Understanding Path Data: The <code>d</code> Attribute</h4>
+            <p>The <code>d</code> attribute of a <code>&lt;path&gt;</code> element contains a series of commands and
+                parameters. Each command is represented by a letter, followed by numerical coordinates or parameters.
+                For example, in <code>M10 20 L30 40</code>, <code>M</code> and <code>L</code> are commands, and
+                <code>10 20</code> and <code>30 40</code> are their respective coordinates.</p>
+            <p><strong>Coordinate System:</strong> Remember, all coordinates are interpreted within the
+                <code>viewBox</code> you define for your SVG. If your <code>viewBox</code> is
+                <code>"0 0 900 600"</code>, then <code>(0,0)</code> is the top-left corner, and <code>(900,600)</code>
+                is the bottom-right.</p>
+            <p><strong>Absolute vs. Relative Coordinates:</strong>
+            <ul>
+                <li><strong>Uppercase Commands (example : <code>M</code>, <code>L</code>, <code>C</code>):</strong> Use
+                    absolute coordinates. <code>L100 100</code> means "draw a line to the point (100,100) in the current
+                    coordinate system."</li>
+                <li><strong>Lowercase Commands (example : <code>m</code>, <code>l</code>, <code>c</code>):</strong> Use
+                    relative coordinates. <code>l10 20</code> means "draw a line to a point that is 10 units to the
+                    right and 20 units down from the current point."</li>
+            </ul>
+            </p>
+            <p>Let's explore the most common and useful path commands for creating waves:</p>
+
+            <h5 class="mt-3"><code>M (moveto)</code> / <code>m (moveto)</code></h5>
+            <p>The "moveto" command sets a new current point, like lifting a pen and moving it to a new spot on the
+                paper without drawing. It's typically the first command in a path.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>M x y</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>m dx dy</code></li>
+                <li><strong>Parameters:</strong>
+                    <ul>
+                        <li><code>x, y</code>: Absolute coordinates to move to.</li>
+                        <li><code>dx, dy</code>: Distance to move relative to the current point.</li>
+                    </ul>
+                </li>
+                <li><strong>Example:</strong> <code>M10 50</code> starts a new path at point (10, 50). If followed by
+                    another coordinate pair (example : <code>M10 50 100 100</code>), the subsequent pairs are treated as
+                    <code>L (lineto)</code> commands.</li>
+            </ul>
+            <div class="tutorial-example my-3">
+                <p><em>Example of M (Moveto) and L (Lineto):</em></p>
+                <svg width="150" height="100" viewBox="0 0 150 100"
+                    style="border: 1px solid #ccc; background-color: #f9f9f9;">
+                    <path d="M20 20 L130 80" stroke="red" stroke-width="2" fill="none" />
+                    <circle cx="20" cy="20" r="3" fill="blue" />
+                </svg>
+                <pre><code class="language-html">&lt;svg width="150" height="100"&gt;
+  &lt;path d="M20 20 L130 80" stroke="red" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;</code></pre>
+            </div>
+
+
+            <h5 class="mt-3"><code>L (lineto)</code> / <code>l (lineto)</code></h5>
+            <p>The "lineto" command draws a straight line from the current point to a new specified point. The new point
+                then becomes the current point.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>L x y</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>l dx dy</code></li>
+                <li><strong>Example:</strong> After <code>M10 10</code>, <code>L90 90</code> draws a line from (10,10)
+                    to (90,90).</li>
+            </ul>
+
+            <h5 class="mt-3"><code>H (horizontal lineto)</code> / <code>h (horizontal lineto)</code></h5>
+            <p>Draws a horizontal line from the current point.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>H x</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>h dx</code></li>
+                <li><strong>Example:</strong> After <code>M10 10</code>, <code>H90</code> draws a horizontal line to
+                    x=90 at the current y-coordinate (y=10).</li>
+            </ul>
+
+            <h5 class="mt-3"><code>V (vertical lineto)</code> / <code>v (vertical lineto)</code></h5>
+            <p>Draws a vertical line from the current point.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>V y</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>v dy</code></li>
+                <li><strong>Example:</strong> After <code>M10 10</code>, <code>V90</code> draws a vertical line to y=90
+                    at the current x-coordinate (x=10).</li>
+            </ul>
+
+            <h5 class="mt-3"><code>C (curveto - Cubic Bézier)</code> / <code>c (curveto - Cubic Bézier)</code></h5>
+            <p>This is one of the most important commands for creating smooth waves. A cubic Bézier curve is defined by
+                a start point (the current point), an end point, and two control points.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>C x1 y1, x2 y2, x y</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>c dx1 dy1, dx2 dy2, dx dy</code></li>
+                <li><strong>Parameters:</strong>
+                    <ul>
+                        <li><code>(x1,y1)</code>: Coordinates of the first control point.</li>
+                        <li><code>(x2,y2)</code>: Coordinates of the second control point.</li>
+                        <li><code>(x,y)</code>: Coordinates of the end point of the curve.</li>
+                    </ul>
+                </li>
+                <li><strong>How it works:</strong> The curve starts tangent to the line from the start point to the
+                    first control point, and ends tangent to the line from the second control point to the end point.
+                    The two control points "pull" the line into a curve.<code>visual1</code> wave uses many
+                    chained <code>C</code> commands.</li>
+            </ul>
+            <div class="tutorial-example my-3">
+                <p><em>Example of C (Cubic Bézier Curve):</em></p>
+                <svg width="200" height="100" viewBox="0 0 200 100"
+                    style="border: 1px solid #ccc; background-color: #f9f9f9;">
+                    <path d="M20 80 C40 20, 160 20, 180 80" stroke="green" stroke-width="2" fill="none" />
+                    <line x1="20" y1="80" x2="40" y2="20" stroke="grey" stroke-dasharray="2,2" />
+                    <line x1="180" y1="80" x2="160" y2="20" stroke="grey" stroke-dasharray="2,2" />
+                    <circle cx="40" cy="20" r="3" fill="orange" />
+                    <circle cx="160" cy="20" r="3" fill="orange" />
+                </svg>
+                <pre><code class="language-html">&lt;svg width="200" height="100"&gt;
+  &lt;path d="M20 80 C40 20, 160 20, 180 80" stroke="green" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;</code></pre>
+            </div>
+
+            <h5 class="mt-3"><code>Q (quadratic Bézier curveto)</code> / <code>q (quadratic Bézier curveto)</code></h5>
+            <p>A quadratic Bézier curve is simpler than a cubic one. It's defined by a start point, an end point, and
+                only one control point.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>Q x1 y1, x y</code></li>
+                <li><strong>Syntax (Relative):</strong> <code>q dx1 dy1, dx dy</code></li>
+                <li><strong>Parameters:</strong>
+                    <ul>
+                        <li><code>(x1,y1)</code>: Coordinates of the control point.</li>
+                        <li><code>(x,y)</code>: Coordinates of the end point of the curve.</li>
+                    </ul>
+                </li>
+                <li><strong>How it works:</strong> The curve is tangent to the lines from the start point to the control
+                    point, and from the control point to the end point. Good for simpler curves or wave segments.</li>
+            </ul>
+            <div class="tutorial-example my-3">
+                <p><em>Example of Q (Quadratic Bézier Curve):</em></p>
+                <svg width="200" height="100" viewBox="0 0 200 100"
+                    style="border: 1px solid #ccc; background-color: #f9f9f9;">
+                    <path d="M20 80 Q100 20, 180 80" stroke="purple" stroke-width="2" fill="none" />
+                    <line x1="20" y1="80" x2="100" y2="20" stroke="grey" stroke-dasharray="2,2" />
+                    <line x1="100" y1="20" x2="180" y2="80" stroke="grey" stroke-dasharray="2,2" />
+                    <circle cx="100" cy="20" r="3" fill="orange" />
+                </svg>
+                <pre><code class="language-html">&lt;svg width="200" height="100"&gt;
+  &lt;path d="M20 80 Q100 20, 180 80" stroke="purple" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;</code></pre>
+            </div>
+
+            <h5 class="mt-3"><code>S (shorthand/smooth curveto - Cubic Bézier)</code> /
+                <code>s (shorthand/smooth curveto - Cubic Bézier)</code></h5>
+            <p>The "smooth curveto" command is used to chain multiple cubic Bézier curves together smoothly. It assumes
+                the first control point of the new curve is a reflection of the last control point of the previous
+                <code>C</code> or <code>S</code> command.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>S x2 y2, x y</code></li>
+                <li><strong>Parameters:</strong>
+                    <ul>
+                        <li><code>(x2,y2)</code>: Coordinates of the second control point for this new curve segment.
+                        </li>
+                        <li><code>(x,y)</code>: Coordinates of the end point of this curve segment.</li>
+                    </ul>
+                </li>
+                <li><strong>Note:</strong> If <code>S</code> follows an <code>M</code> or <code>L</code> command (or is
+                    the first command), the first control point is assumed to be the same as the current point.</li>
+            </ul>
+
+            <h5 class="mt-3"><code>T (shorthand/smooth quadratic Bézier curveto)</code> /
+                <code>t (shorthand/smooth quadratic Bézier curveto)</code></h5>
+            <p>Similar to <code>S</code>, but for quadratic Bézier curves. It creates a smooth continuation of a
+                previous quadratic curve.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong> <code>T x y</code></li>
+                <li><strong>Parameters:</strong>
+                    <ul>
+                        <li><code>(x,y)</code>: Coordinates of the end point of this curve segment.</li>
+                    </ul>
+                </li>
+                <li><strong>Note:</strong> The control point is calculated based on the control point of the previous
+                    <code>Q</code> or <code>T</code> command.</li>
+            </ul>
+
+            <h5 class="mt-3"><code>A (elliptical arc)</code> / <code>a (elliptical arc)</code></h5>
+            <p>This command draws an elliptical arc from the current point to a new point. While powerful for creating
+                circular or elliptical shapes, waves are more commonly constructed using Bézier curves (<code>C</code>
+                or <code>Q</code>) for more organic, flowing forms.</p>
+            <ul>
+                <li><strong>Syntax (Absolute):</strong>
+                    <code>A rx ry x-axis-rotation large-arc-flag sweep-flag x y</code></li>
+                <li>It has several parameters defining the radii of the ellipse (<code>rx, ry</code>), its rotation, and
+                    how the arc is drawn (<code>large-arc-flag, sweep-flag</code>) to the end point <code>(x,y)</code>.
+                </li>
+            </ul>
+
+            <h5 class="mt-3"><code>Z (closepath)</code> / <code>z (closepath)</code></h5>
+            <p>The "closepath" command ends the current subpath by drawing a straight line from the current point back
+                to the starting point of the current subpath (the last <code>M</code> command). It's essential for
+                creating closed shapes that can be filled.</p>
+            <ul>
+                <li><strong>Syntax:</strong> <code>Z</code> (or <code>z</code> - case doesn't matter here)</li>
+                <li><strong>Example:</strong> <code>M10 10 L90 10 L50 90 Z</code> creates a triangle.
+                    <code>visual1</code> wave uses <code>Z</code> at the end to close the shape and allow it to be
+                    filled with color.</li>
+            </ul>
+            <div class="tutorial-example my-3">
+                <p><em>Example of Z (Closepath) forming a triangle:</em></p>
+                <svg width="100" height="100" viewBox="0 0 100 100"
+                    style="border: 1px solid #ccc; background-color: #f9f9f9;">
+                    <path d="M10 10 L90 10 L50 90 Z" fill="lightblue" stroke="blue" stroke-width="2" />
+                </svg>
+                <pre><code class="language-html">&lt;svg width="100" height="100"&gt;
+  &lt;path d="M10 10 L90 10 L50 90 Z" fill="lightblue" stroke="blue" stroke-width="2" /&gt;
+&lt;/svg&gt;</code></pre>
+            </div>
+
+            <p class="mt-4">With these commands, especially <code>M</code>, <code>L</code>, <code>C</code> (or
+                <code>Q</code>), and <code>Z</code>, you have all the tools you need to define complex shapes like
+                waves. In the next step, we'll try to construct a simple wave segment.</p>
+
+        </section>
+        <h4 class="mt-5">Step-by-Step: Building a Simple Wave</h4>
+            <p>Let's construct a basic, single-hump wave. We'll aim to create a shape that starts at the top-left, curves up and then down to the top-right, and then drops down to form a fillable area.</p>
+
+            <h5>Step 1: Setting up the SVG Canvas</h5>
+            <p>First, we need an <code>&lt;svg&gt;</code> element to draw in. We'll define a <code>viewBox</code> to set our coordinate system. For this example, let's use a viewBox that is 300 units wide and 100 units high.</p>
+            <div class="tutorial-example my-3">
+                <p><em>Our canvas (nothing visible yet):</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;"&gt;
+  &lt;!-- Path will go here --&gt;
+&lt;/svg&gt;
+                </code></pre>
+            </div>
+
+            <h5>Step 2: Starting the Path (Moveto <code>M</code>)</h5>
+            <p>We'll start our wave from the top-left corner of our viewBox, but let's give it a little vertical offset so the wave doesn't start right at the very top edge. Let's start at point (0, 20).</p>
+            <div class="tutorial-example my-3">
+                <p><em>Path starts at (0,20). (A tiny dot if stroked, otherwise invisible):</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    <path d="M0 20" stroke="blue" stroke-width="1" fill="none" />
+                    <circle cx="0" cy="20" r="2" fill="red" /> </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100"&gt;
+  &lt;path d="M0 20" stroke="blue" stroke-width="1" fill="none" /&gt;
+&lt;/svg&gt;
+                </code></pre>
+                <p>Path data: <code>d="M0 20"</code></p>
+            </div>
+
+            <h5>Step 3: Drawing the Wave Curve (Quadratic Bézier <code>Q</code>)</h5>
+            <p>Now, let's draw the top curve of our wave. For simplicity, we'll use a single Quadratic Bézier curve (<code>Q</code>). A quadratic Bézier curve needs one control point and an end point.</p>
+            <ul>
+                <li>Current point (start of curve): (0, 20)</li>
+                <li>Control point (pulls the curve upwards): Let's try (150, -30) – this x is halfway across our 300-width viewBox, and y is negative to pull the curve above our starting y of 20.</li>
+                <li>End point of the curve: Let's make it (300, 20) to span the full width at the same initial height.</li>
+            </ul>
+            <p>So the command will be <code>Q150 -30, 300 20</code>.</p>
+            <div class="tutorial-example my-3">
+                <p><em>The top curve of our wave:</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    <path d="M0 20 Q150 -30, 300 20" stroke="blue" stroke-width="2" fill="none" />
+                    <line x1="0" y1="20" x2="150" y2="-30" stroke="grey" stroke-dasharray="2,2"/>
+                    <line x1="150" y1="-30" x2="300" y2="20" stroke="grey" stroke-dasharray="2,2"/>
+                    <circle cx="150" cy="-30" r="3" fill="orange" />
+                </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100"&gt;
+  &lt;path d="M0 20 Q150 -30, 300 20" stroke="blue" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;
+                </code></pre>
+                <p>Path data: <code>d="M0 20 Q150 -30, 300 20"</code></p>
+                <p><em>Note: The control point (150, -30) is outside our typical positive y-range for the viewBox height of 100, but that's okay; it still influences the curve correctly.</em></p>
+            </div>
+
+            <h5>Step 4: Drawing Down to the Bottom-Right (Lineto <code>L</code>)</h5>
+            <p>Our path currently ends at (300, 20). To create the body of the wave for filling, we need to draw a line down to the bottom-right of our intended wave area. Let's go to (300, 100) (bottom-right of the viewBox).</p>
+            <div class="tutorial-example my-3">
+                <p><em>Line drawn down to the bottom-right:</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    <path d="M0 20 Q150 -30, 300 20 L300 100" stroke="blue" stroke-width="2" fill="none" />
+                </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100"&gt;
+  &lt;path d="M0 20 Q150 -30, 300 20 L300 100" stroke="blue" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;
+                </code></pre>
+                <p>Path data: <code>d="M0 20 Q150 -30, 300 20 L300 100"</code></p>
+            </div>
+
+            <h5>Step 5: Drawing Across the Bottom (Lineto <code>L</code>)</h5>
+            <p>From (300, 100), we draw a line to the bottom-left, which is (0, 100).</p>
+            <div class="tutorial-example my-3">
+                <p><em>Line drawn across the bottom to the bottom-left:</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    <path d="M0 20 Q150 -30, 300 20 L300 100 L0 100" stroke="blue" stroke-width="2" fill="none" />
+                </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100"&gt;
+  &lt;path d="M0 20 Q150 -30, 300 20 L300 100 L0 100" stroke="blue" stroke-width="2" fill="none" /&gt;
+&lt;/svg&gt;
+                </code></pre>
+                <p>Path data: <code>d="M0 20 Q150 -30, 300 20 L300 100 L0 100"</code></p>
+            </div>
+
+            <h5>Step 6: Closing the Path (Closepath <code>Z</code>) and Adding Fill</h5>
+            <p>Finally, we use the <code>Z</code> command to draw a line from the current point (0, 100) back to our starting point (0, 20), closing the shape. Then we can add a <code>fill</code> attribute to color our wave.</p>
+            <div class="tutorial-example my-3">
+                <p><em>The closed and filled wave:</em></p>
+                <svg width="300" height="100" viewBox="0 0 300 100" style="border:1px solid #eee;">
+                    <path d="M0 20 Q150 -30, 300 20 L300 100 L0 100 Z" fill="skyblue" stroke="darkblue" stroke-width="1" />
+                </svg>
+                <pre><code class="language-html">
+&lt;svg width="300" height="100" viewBox="0 0 300 100"&gt;
+  &lt;path d="M0 20 Q150 -30, 300 20 L300 100 L0 100 Z" fill="skyblue" stroke="darkblue" stroke-width="1" /&gt;
+&lt;/svg&gt;
+                </code></pre>
+                <p>Final Path data: <code>d="M0 20 Q150 -30, 300 20 L300 100 L0 100 Z"</code></p>
+                <p>And there you have it – a simple, single-hump SVG wave created from scratch!</p>
+            </div>
+
+            <p class="mt-4">From here, There are a lot to experiment with:
+                <ul>
+                    <li>Using multiple <code>Q</code> or <code>C</code> (Cubic Bézier) commands to create more complex, multi-humped waves (like homepage examples).</li>
+                    <li>Changing the coordinates of the control points to alter the shape and height of the waves.</li>
+                    <li>Layering multiple paths with different fill colors and opacities.</li>
+                    <li>Animating these paths with CSS or JavaScript.</li>
+                </ul>
+            </p>
+            <p>For instance, homepage wave <code>visual1</code> uses a series of chained <code>C</code> (Cubic Bézier) commands for its top edge, which allows for more complex curves than a single <code>Q</code> command.</p>
+
+        </section>
+</main>
+
+<%- include('footer') %>

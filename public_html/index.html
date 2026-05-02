@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+  <!--Bootstrap Icons-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!--Favicon-->
+  <link rel="icon" href="Resources/favicon-16x16.png" type="image/x-icon">
+  <!--Css Link-->
+  <link rel="stylesheet" href="style.css">
+  <!--Google Fonts-->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dynalight&display=swap" rel="stylesheet">
+
+  <title>Engli Go</title>
+</head>
+
+<body>
+  <!--Navbar-->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary" style=" position: sticky; top: 0; z-index: 50;">
+    <div class="container-fluid">
+      <!--Engli Go Logo-->
+      <img id="logo" src="Resources/EngliGo_Logo_Trans.png" alt="Logo" class="d-inline-block align-text-top">
+      <!--Engli Go Text-->
+      <a id="engligobrand" class="navbar-brand" href="index.html">EngliGo</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent" style="margin-left: 150px; font-size: 20px;">
+        <!--Creating Navbar items-->
+        <ul id="navbarMenu" class="navbar-nav me-auto mb-lg-0 gap-4">
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="index.html">Home</a>
+          </li>
+          <!--Making an item dropdown-->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="learnEnglish.html" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              Learn English
+            </a>
+            <!--Creating dropdown menu-->
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item"  href="learnEnglish.html">Learn English</a></li>
+              <li class="dropdown-submenu"> <a class="dropdown-item dropdown-toggle" href="courses.html">Courses</a>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="preielts.html">Pre-IELTS</a></li>
+                  <li><a class="dropdown-item" href="ielts.html">IELTS</a></li>
+                </ul>
+              </li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li><a class="dropdown-item" href="learningHub.html">Learning Hub</a></li>
+              <li><a class="dropdown-item" href="books.html">Books</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/classes">Classes</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="contactUs.html">Contact Us</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="aboutUs.html">About US</a>
+          </li>
+        </ul>
+        <!--Creating search-->
+        <form class="d-flex" role="search">
+          <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+          <button class="btn btn-outline-success" type="submit">Search</button>
+        </form>
+        <!--creating log in and view cart-->
+        <div class="d-flex align-items-center ms-lg-3 gap-2 " style="margin-right: 10px;">
+          <a href="/login" class="nav-link d-flex align-items-center me-3" aria-label="Log In">
+            <i class="bi bi-person-circle me-1" style="font-size: 1.6rem; vertical-align: middle;"></i>
+            <span style="font-weight: 500; text-transform: uppercase; font-size: 0.9rem;">Log In</span>
+          </a>
+          <a href="#" class="nav-link position-relative" aria-label="View Cart">
+            <i class="bi bi-cart3" style="font-size: 1.6rem;"></i>
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size: 0.65em;">
+              0
+              <span class="visually-hidden">items in cart</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <!--Hero Image-->
+  <div class="heroImage">
+    <img id="hero" src="Resources/board-64269_1280.jpg" alt="Hero Image" class="img-fluid"
+      style="width: 100%; height: 50%; margin-top: -20px;">
+    <svg id="visual1" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="none" class="svg-divider">
+      <path
+        d="M0 508L30 505.5C60 503 120 498 180 487.3C240 476.7 300 460.3 360 463.3C420 466.3 480 488.7 540 488.8C600 489 660 467 720 466.2C780 465.3 840 485.7 870 495.8L900 506L900 601L870 601C840 601 780 601 720 601C660 601 600 601 540 601C480 601 420 601 360 601C300 601 240 601 180 601C120 601 60 601 30 601L0 601Z"
+        fill="rgb(191, 236, 255)" stroke-linecap="round" stroke-linejoin="miter"></path>
+    </svg>
+  </div>
+
+  <!--Create a container for the text and image-->
+  <div class="firstSection container-fluid" style="background-color:rgb(191, 236, 255); margin-top: -20px;">
+    <!--Adding a new Button to redirect to a new dynamic page-->
+    <div class="container text-center pt-4 pb-3" style="position: relative; z-index: 2;">
+       <a href="/learnSvg" class="btn btn-info btn-lg">Learn About SVG Waves & How to Create Them</a>
+    </div>
+    <h1 id="siteDirectionTitle" class="text-center">
+      <span class="title-highlight">Learn English with EngliGo</span>
+    </h1>
+    <div class="row" style="margin-top: 100px; margin-bottom: 50px;">
+      <div class="siteDirectionSection col-md-4 col-sm-12 position-relative">
+        <img class="img-fluid" src="Resources/pexels-Courses.jpg" alt="Courses">
+        <h1 class="siteDirectionDesc"><a class="siteDirectionLink" href="courses.html">Courses</a></h1>
+      </div>
+      <div class="siteDirectionSection col-md-4 col-sm-12 position-relative">
+        <img class="img-fluid" src="Resources/pexels-Courses4.jpg" alt="Books">
+        <h1 class="siteDirectionDesc"><a class="siteDirectionLink" href="books.html">Books</a></h1>
+      </div>
+      <div class="siteDirectionSection col-md-4 col-sm-12 position-relative">
+        <img class="img-fluid" src="Resources/pexels-Courses3.jpg" alt="Learning Hub">
+        <h1 class="siteDirectionDesc"><a class="siteDirectionLink" href="learningHub.html">Learning Hub</a></h1>
+      </div>
+    </div>
+    <!--Create a wave svg in Haikei website and add the svg here-->
+    <svg id="visual2" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="none" class="svg-divider">
+      <path
+        d="M0 508L30 505.5C60 503 120 498 180 487.3C240 476.7 300 460.3 360 463.3C420 466.3 480 488.7 540 488.8C600 489 660 467 720 466.2C780 465.3 840 485.7 870 495.8L900 506L900 601L870 601C840 601 780 601 720 601C660 601 600 601 540 601C480 601 420 601 360 601C300 601 240 601 180 601C120 601 60 601 30 601L0 601Z"
+        fill="rgb(255, 246, 227)" stroke-linecap="round" stroke-linejoin="miter"></path>
+    </svg>
+  </div>
+
+  <!--Create next section -carousel-->
+  <div class="secondSection container-fluid">
+    <div class="container">
+      <div id="carouselSlidesMain" class="carousel slide image-fluid" data-bs-ride="carousel">
+        <div class="carousel-inner">
+          <div class="carousel-item active">
+            <img src="Resources/pexels-Courses2.jpg" class="d-block w-100" alt="Learn English">
+          </div>
+          <div class="carousel-item">
+            <img src="Resources/unplash-english.jpg" class="d-block w-100" alt="Learn English">
+          </div>
+          <div class="carousel-item">
+            <img src="Resources/unplash-dictionary.jpg" class="d-block w-100" alt="Learn English">
+          </div>
+        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#carouselSlidesMain" data-bs-slide="prev">
+          <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+          <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#carouselSlidesMain" data-bs-slide="next">
+          <span class="carousel-control-next-icon" aria-hidden="true"></span>
+          <span class="visually-hidden">Next</span>
+        </button>
+      </div>
+      <div class="container text-center mt-5 mb-5" style="z-index: 200">
+        <button type="button" class="btn btn-primary btn-lg" onclick="window.location.href='learnEnglish.html'">Learn English</button>
+      </div>
+    </div>
+    <!--Create a wave svg in Haikei website and add the svg here-->
+    <svg id="visual3" viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" preserveAspectRatio="none" class="svg-divider">
+      <path
+        d="M0 508L30 505.5C60 503 120 498 180 487.3C240 476.7 300 460.3 360 463.3C420 466.3 480 488.7 540 488.8C600 489 660 467 720 466.2C780 465.3 840 485.7 870 495.8L900 506L900 601L870 601C840 601 780 601 720 601C660 601 600 601 540 601C480 601 420 601 360 601C300 601 240 601 180 601C120 601 60 601 30 601L0 601Z"
+        fill="rgb(255, 204, 234)" stroke-linecap="round" stroke-linejoin="miter"></path>
+    </svg>
+  </div>
+
+  <!--Create last section of homepage contact form-->
+  <div class="thirdSection container-fluid" style="background-color: rgb(255, 204, 234);">
+    <div class="contact-form-container">
+      <h3>Contact Us</h3>
+      <form class="needs-validation" novalidate>
+
+        <div class="mb-3">
+          <label for="contactName" class="form-label">Name</label>
+          <input type="text" class="form-control" id="contactName" name="contact_name" placeholder="Enter your name"
+            required />
+            <div class="invalid-feedback">
+              Please enter your Name.
+            </div>
+            <div class="valid-feedback">
+              Looks good!
+            </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="contactEmail" class="form-label">Email Address</label>
+          <input type="email" class="form-control" id="contactEmail" name="contact_email" placeholder="name@example.com"
+            required />
+            <div class="invalid-feedback">
+              Please enter your Email.
+            </div>
+            <div class="valid-feedback">
+              Looks good!
+            </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="contactComment" class="form-label">Comment or Message</label>
+          <textarea class="form-control" id="contactComment" name="contact_comment" rows="5"
+            placeholder="Enter your message here..." required></textarea>
+            <div class="invalid-feedback">
+              Please Type Your Comment.
+            </div>
+            <div class="valid-feedback">
+              Looks good!
+            </div>
+        </div>
+        <div id="form-messages" role="alert" class="mb-3"></div> <!--added to handle the message-->
+        <div class="text-center">
+          <button type="submit" class="btn btn-primary btn-lg">Submit Message</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+  <!--Footer-->
+  <footer class="bg-light text-center text-lg-start " style="margin: 0px;">
+    <div class="text-center " style="background-color: rgb(205, 193, 255); padding-top: 10px;">
+      © 2023 EngliGo:
+      <a class="text-dark" href="#">EngliGo.net</a>
+      <p>Design by: Aaron Alijani</p>
+      <p>All rights reserved</p>
+    </div>
+  </footer>
+  <!--Bootstrap JS-->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq"
+    crossorigin="anonymous"></script>
+    <!--Adding Javascript-->
+  <script src="engliGo.js"></script>
+</body>
+
+</html>

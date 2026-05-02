@@ -1,0 +1,87 @@
+<%- include('header', { pageTitle: pageTitle }) %>
+
+<main class="container my-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">My Bookings</h1>
+        <p class="lead">Your upcoming and past class bookings.</p>
+    </div>
+
+    <% if (statusMessage === 'booked') { %>
+        <div class="alert alert-success" role="alert">
+            <i class="bi bi-check-circle me-2"></i>Class booked successfully!
+        </div>
+    <% } else if (statusMessage === 'cancelled') { %>
+        <div class="alert alert-success" role="alert">
+            <i class="bi bi-check-circle me-2"></i>Booking cancelled.
+        </div>
+    <% } %>
+
+    <% if (errorMessage === 'already-booked') { %>
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>You have already booked this class.
+        </div>
+    <% } else if (errorMessage === 'cancel-failed') { %>
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-x-circle me-2"></i>Could not cancel the booking. Please try again.
+        </div>
+    <% } else if (errorMessage === 'not-found') { %>
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-x-circle me-2"></i>Booking not found.
+        </div>
+    <% } else if (errorMessage === 'invalid-booking') { %>
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-x-circle me-2"></i>Invalid booking reference.
+        </div>
+    <% } %>
+
+    <% if (bookings.length === 0) { %>
+        <div class="alert alert-info text-center" role="alert">
+            You haven't booked any classes yet.
+            <a href="/classes" class="alert-link">Browse available classes</a> to get started.
+        </div>
+    <% } else { %>
+        <div class="row g-4">
+            <% bookings.forEach(b => { %>
+                <% const startDate = new Date(b.start_time); %>
+                <% const isPast = startDate < new Date(); %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm <%= isPast ? 'opacity-75' : '' %>" style="height: auto; border-radius: 15px; border: none;">
+                        <div class="card-body p-4">
+                            <span class="badge rounded-pill mb-2" style="background-color: <%= isPast ? '#ddd' : '#CDC1FF' %>; color: #333;">
+                                <%= b.course_name %>
+                            </span>
+                            <% if (isPast) { %>
+                                <span class="badge rounded-pill bg-secondary mb-2">Past</span>
+                            <% } %>
+                            <h5 class="card-title fw-bold"><%= b.title %></h5>
+                            <ul class="list-unstyled small mb-3 mt-3">
+                                <li class="mb-1"><i class="bi bi-person-badge me-2"></i><%= b.teacher_name %></li>
+                                <li class="mb-1"><i class="bi bi-geo-alt me-2"></i><%= b.location %></li>
+                                <li class="mb-1"><i class="bi bi-calendar-event me-2"></i>
+                                    <%= startDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) %>
+                                </li>
+                                <li class="mb-1"><i class="bi bi-clock me-2"></i>
+                                    <%= startDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) %>
+                                    (<%= b.duration_minutes %> min)
+                                </li>
+                            </ul>
+
+                            <% if (!isPast) { %>
+                                <form action="/bookings/<%= b.booking_id %>/cancel" method="POST"
+                                      onsubmit="return confirm('Are you sure you want to cancel this booking?');">
+                                    <button type="submit" class="btn btn-outline-danger w-100">
+                                        <i class="bi bi-x-circle me-1"></i> Cancel booking
+                                    </button>
+                                </form>
+                            <% } else { %>
+                                <p class="text-muted small mb-0 fst-italic">This class has already taken place.</p>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</main>
+
+<%- include('footer') %>

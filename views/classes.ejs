@@ -1,0 +1,65 @@
+<%- include('header', { pageTitle: pageTitle }) %>
+
+<main class="container my-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">Available Classes</h1>
+        <p class="lead">Browse all upcoming class sessions and book your spot.</p>
+    </div>
+
+    <% if (sessions.length === 0) { %>
+        <div class="alert alert-info text-center" role="alert">
+            No upcoming classes are scheduled at the moment. Please check back later.
+        </div>
+    <% } else { %>
+        <div class="row g-4">
+            <% sessions.forEach(s => { %>
+                <% const spotsRemaining = s.capacity - s.booked_count; %>
+                <% const startDate = new Date(s.start_time); %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm" style="height: auto; border-radius: 15px; border: none;">
+                        <div class="card-body p-4">
+                            <span class="badge rounded-pill mb-2" style="background-color: #CDC1FF; color: #333;">
+                                <%= s.course_name %>
+                            </span>
+                            <h5 class="card-title fw-bold"><%= s.title %></h5>
+                            <ul class="list-unstyled small mb-3 mt-3">
+                                <li class="mb-1"><i class="bi bi-person-badge me-2"></i><%= s.teacher_name %></li>
+                                <li class="mb-1"><i class="bi bi-geo-alt me-2"></i><%= s.location %></li>
+                                <li class="mb-1"><i class="bi bi-calendar-event me-2"></i>
+                                    <%= startDate.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) %>
+                                </li>
+                                <li class="mb-1"><i class="bi bi-clock me-2"></i>
+                                    <%= startDate.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) %>
+                                    (<%= s.duration_minutes %> min)
+                                </li>
+                                <li class="mt-2">
+                                    <i class="bi bi-people me-2"></i>
+                                    <% if (spotsRemaining > 0) { %>
+                                        <strong class="text-success"><%= spotsRemaining %></strong> of <%= s.capacity %> spots left
+                                    <% } else { %>
+                                        <strong class="text-danger">Class full</strong>
+                                    <% } %>
+                                </li>
+                            </ul>
+
+                            <% if (isLoggedIn) { %>
+                                <form action="/bookings" method="POST">
+                                    <input type="hidden" name="session_id" value="<%= s.id %>">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-bookmark-plus me-1"></i> Book this class
+                                    </button>
+                                </form>
+                            <% } else { %>
+                                <a href="/login" class="btn btn-outline-primary w-100">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i> Log in to book
+                                </a>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } %>
+</main>
+
+<%- include('footer') %>
