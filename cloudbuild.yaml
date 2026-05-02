@@ -1,0 +1,63 @@
+# Cloud Build pipeline for EngliGo
+# Triggered on git push to main branch
+# Builds image -> pushes to GHCR -> deploys to GKE -> verifies rollout
+
+steps:
+  - id: 'build'
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'ghcr.io/${_GHCR_USERNAME}/${_GHCR_IMAGE}:${SHORT_SHA}'
+      - '-t'
+      - 'ghcr.io/${_GHCR_USERNAME}/${_GHCR_IMAGE}:latest'
+      - '.'
+
+  - id: 'ghcr-login'
+    name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'echo "$$GHCR_TOKEN" | docker login ghcr.io -u ${_GHCR_USERNAME} --password-stdin'
+    secretEnv: ['GHCR_TOKEN']
+
+  - id: 'push-sha'
+    name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'ghcr.io/${_GHCR_USERNAME}/${_GHCR_IMAGE}:${SHORT_SHA}']
+  - id: 'push-latest'
+    name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'ghcr.io/${_GHCR_USERNAME}/${_GHCR_IMAGE}:latest']
+
+  - id: 'deploy'
+    name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/engligo'
+      - 'engligo=ghcr.io/${_GHCR_USERNAME}/${_GHCR_IMAGE}:${SHORT_SHA}'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+
+  - id: 'verify-rollout'
+    name: 'gcr.io/cloud-builders/kubectl'
+    args: ['rollout', 'status', 'deployment/engligo', '--timeout=180s']
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/${PROJECT_ID}/secrets/ghcr-token/versions/latest'
+      env: 'GHCR_TOKEN'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _GHCR_USERNAME: 'aaronalijani'
+  _GHCR_IMAGE: 'engligo-cloud'
+  _GKE_CLUSTER: 'engligo-cluster'
+  _GKE_ZONE: 'australia-southeast1-a'
+
+timeout: '1200s'
