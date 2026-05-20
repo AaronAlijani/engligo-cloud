@@ -1,29 +1,31 @@
 # ============================================================================
-# EngliGo - End-to-end CI/CD pipeline for SIT737 10.2HD
+# EngliGo - CI/CD pipeline for SIT737 10.2HD
 # ----------------------------------------------------------------------------
 # Replaces Stage 1's build-only Cloud Build pipeline. On every push to main,
-# this workflow:
-#   1. Builds the multi-stage Docker image
-#   2. Pushes it to GitHub Container Registry (both :sha and :latest tags)
-#   3. Authenticates to Google Cloud using a service account key
-#      (Workload Identity Federation was attempted but blocked by Deakin's
-#      setIamPolicy restriction; documented in 10.2HD report)
-#   4. Connects to the GKE cluster
-#   5. Updates the Deployment to use the new SHA-tagged image
-#   6. Waits for the rollout to complete (or fails the workflow)
-#   7. Runs a smoke test against the LoadBalancer
+# this workflow automates the build and push stages that were manual in
+# Stage 1.
 #
-# This closes the gap identified in 7.2HD feedback: the push and deploy
-# stages are now fully automated and tied to a single 'git push' trigger.
+# IMPORTANT - Deploy automation limitation:
+# The deploy step (kubectl set image + rollout status) is preserved below as
+# COMMENTED design intent rather than executed code, because the Deakin sandbox
+# project denies setIamPolicy globally to student accounts (verified Stage 2).
+# Without setIamPolicy, no service account can be granted container.clusters.get,
+# which google-github-actions/get-gke-credentials requires. This blocker is
+# project-wide and documented in the 10.2HD limitations section.
+#
+# Pipeline status:
+#   Stage 1: Build only (Cloud Build) - 1 of 4 steps automated
+#   Stage 2: Build + push (GitHub Actions) - 2 of 4 steps automated
+#   Stage 3: Full end-to-end (pending Deakin IAM unblock or escalation)
 # ============================================================================
 
-name: Build and Deploy to GKE
+name: Build and Push to GHCR
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: ghcr.io/aaronalijani/engligo-cloud
@@ -31,8 +33,8 @@ env:
   CONTAINER_NAME: engligo
 
 jobs:
-  build-and-deploy:
-    name: Build, Push, and Deploy
+  build-and-push:
+    name: Build and Push
     runs-on: ubuntu-latest
 
     permissions:
@@ -41,9 +43,15 @@ jobs:
       id-token: write
 
     steps:
+      # ----------------------------------------------------------------
+      # 1. Check out the repository
+      # ----------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ----------------------------------------------------------------
+      # 2. Log in to GitHub Container Registry
+      # ----------------------------------------------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -51,9 +59,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # ----------------------------------------------------------------
+      # 3. Set up Docker Buildx
+      # ----------------------------------------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # ----------------------------------------------------------------
+      # 4. Build and push the image with both :sha and :latest tags
+      # ----------------------------------------------------------------
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -65,76 +79,91 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-
-      - name: Install GKE auth plugin
+      # ----------------------------------------------------------------
+      # 5. Print the deploy command for the operator
+      # ----------------------------------------------------------------
+      # Since automated deploy is IAM-blocked, this step generates the
+      # exact one-line command an operator runs from Cloud Shell to
+      # complete the deployment. Reduces the manual deploy from Stage 1's
+      # multi-step process (docker tag + docker push + kubectl set image)
+      # to a single command.
+      - name: Print deploy command
         run: |
-          gcloud components install gke-gcloud-auth-plugin --quiet
+          echo ""
+          echo "============================================================"
+          echo " Image built and pushed successfully."
+          echo " To deploy to GKE, run from Cloud Shell:"
+          echo ""
+          echo "   kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \\"
+          echo "     ${{ env.CONTAINER_NAME }}=${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo ""
+          echo "   kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }}"
+          echo "============================================================"
 
-      - name: Get GKE credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: ${{ vars.GKE_CLUSTER }}
-          location: ${{ vars.GKE_ZONE }}
-
-      - name: Update Deployment image
-        run: |
-          kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
-            ${{ env.CONTAINER_NAME }}=${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Wait for rollout to complete
-        run: |
-          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
-            --timeout=300s
-
-      - name: Verify deployed image
-        run: |
-          DEPLOYED_IMAGE=$(kubectl get deployment/${{ env.DEPLOYMENT_NAME }} \
-            -o jsonpath='{.spec.template.spec.containers[0].image}')
-          echo "Deployed image: $DEPLOYED_IMAGE"
-          EXPECTED="${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          if [ "$DEPLOYED_IMAGE" = "$EXPECTED" ]; then
-            echo "Image matches expected SHA tag"
-          else
-            echo "Mismatch: expected $EXPECTED"
-            exit 1
-          fi
-
-      - name: Smoke test /health endpoint
-        run: |
-          EXTERNAL_IP=$(kubectl get svc engligo-service \
-            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Smoke-testing http://$EXTERNAL_IP/health"
-          for i in 1 2 3 4 5; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              --max-time 5 "http://$EXTERNAL_IP/health" || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "Smoke test passed (HTTP $HTTP_CODE)"
-              exit 0
-            fi
-            echo "Attempt $i: HTTP $HTTP_CODE, retrying in 10s..."
-            sleep 10
-          done
-          echo "Smoke test failed after 5 attempts"
-          exit 1
-
+      # ----------------------------------------------------------------
+      # 6. Workflow summary
+      # ----------------------------------------------------------------
       - name: Workflow summary
         if: always()
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Build & Push Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | \`${{ env.IMAGE_NAME }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Cluster | \`${{ vars.GKE_CLUSTER }}\` (${{ vars.GKE_ZONE }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deployment | \`${{ env.DEPLOYMENT_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image (SHA-tagged) | \`${{ env.IMAGE_NAME }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image (latest)     | \`${{ env.IMAGE_NAME }}:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Triggered by | ${{ github.event_name }} by ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### To complete deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run from Cloud Shell (with cluster credentials):" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \\" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ env.CONTAINER_NAME }}=${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+# ============================================================================
+# --- BELOW: Full intended pipeline preserved as commented design intent ---
+# ----------------------------------------------------------------------------
+# These steps would complete end-to-end automation if granted the
+# 'roles/container.developer' role on the deploying service account.
+# Stage 1's cloudbuild.yaml used the same documentation pattern.
+# ============================================================================
+#
+#      - name: Authenticate to Google Cloud
+#        uses: google-github-actions/auth@v2
+#        with:
+#          credentials_json: ${{ secrets.GCP_SA_KEY }}
+#
+#      - name: Set up gcloud CLI
+#        uses: google-github-actions/setup-gcloud@v2
+#        with:
+#          project_id: ${{ vars.GCP_PROJECT_ID }}
+#
+#      - name: Install GKE auth plugin
+#        run: gcloud components install gke-gcloud-auth-plugin --quiet
+#
+#      - name: Get GKE credentials
+#        uses: google-github-actions/get-gke-credentials@v2
+#        with:
+#          cluster_name: ${{ vars.GKE_CLUSTER }}
+#          location: ${{ vars.GKE_ZONE }}
+#
+#      - name: Update Deployment image
+#        run: |
+#          kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
+#            ${{ env.CONTAINER_NAME }}=${{ env.IMAGE_NAME }}:${{ github.sha }}
+#
+#      - name: Wait for rollout to complete
+#        run: |
+#          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+#            --timeout=300s
+#
+#      - name: Smoke test /health endpoint
+#        run: |
+#          EXTERNAL_IP=$(kubectl get svc engligo-service \
+#            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+#          curl -fsS --max-time 10 "http://$EXTERNAL_IP/health" || exit 1
