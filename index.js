@@ -1,588 +1,284 @@
-// EngliGo Web Server - Cloud-native edition
-// Patched for SIT737 7.2HD Capstone
+// EngliGo Server — Stage 3 (PostgreSQL sidecar)
+// Twelve-Factor: config via env, logs to stdout as JSON, graceful shutdown.
+// Migrated from SQLite to PostgreSQL. DB init handled by initContainer.
 
-const express = require('express');
-const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const session = require('express-session');
-const bcrypt = require('bcrypt');
+const express      = require('express');
+const session      = require('express-session');
+const MemoryStore  = require('memorystore')(session);
+const bodyParser   = require('body-parser');
+const bcrypt       = require('bcrypt');
+const { Pool }     = require('pg');
+const path         = require('path');
 
-// --- Configuration from environment ---
-const PORT = parseInt(process.env.PORT, 10) || 3000;
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'engligo.db');
-const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-insecure-secret-change-me';
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const BCRYPT_ROUNDS = 10;
+// --- Configuration ---
+const PORT           = process.env.PORT           || 3000;
+const NODE_ENV       = process.env.NODE_ENV       || 'development';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-prod';
+const TRUST_PROXY    = process.env.TRUST_PROXY === 'true';
 
-// Refuse to start in production with the dev fallback secret
-if (NODE_ENV === 'production' && SESSION_SECRET === 'dev-only-insecure-secret-change-me') {
-    console.error('FATAL: SESSION_SECRET must be set in production.');
+if (NODE_ENV === 'production' && SESSION_SECRET === 'dev-only-secret-do-not-use-in-prod') {
+    console.error('FATAL: SESSION_SECRET not set in production. Exiting.');
     process.exit(1);
 }
 
-const app = express();
-
-// --- Structured JSON request logging ---
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        console.log(JSON.stringify({
-            ts: new Date().toISOString(),
-            level: 'info',
-            method: req.method,
-            path: req.path,
-            status: res.statusCode,
-            durationMs: Date.now() - start
-        }));
-    });
-    next();
+// --- PostgreSQL pool ---
+const pool = new Pool({
+    host:     process.env.PG_HOST     || 'localhost',
+    port:     parseInt(process.env.PG_PORT || '5432'),
+    database: process.env.PG_DB       || 'engligo',
+    user:     process.env.PG_USER     || 'engligo',
+    password: process.env.PG_PASSWORD || 'engligo',
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
 });
 
-// --- Database connection ---
-const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
-    if (err) {
-        console.error('Error : Connecting to Database', err.message);
-    } else {
-        console.log(`Successfully connected to database at ${DB_PATH}`);
-        // Enforce FK constraints on this connection
-        db.run('PRAGMA foreign_keys = ON');
-    }
+pool.on('error', (err) => {
+    console.error(JSON.stringify({ ts: new Date().toISOString(), level: 'error', message: 'PG pool error', error: err.message }));
 });
 
-// Track DB readiness for the /ready probe
-let dbReady = false;
-db.get('SELECT 1', (err) => { dbReady = !err; });
-
-// --- View engine ---
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-// --- Core middleware ---
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static('public_html'));
-
-// --- Session middleware ---
-// If running behind a load balancer that terminates HTTPS, trust the proxy
-if (process.env.TRUST_PROXY === 'true') {
-    app.set('trust proxy', 1);
+// --- Structured JSON logger ---
+function log(level, fields) {
+    console.log(JSON.stringify({ ts: new Date().toISOString(), level, ...fields }));
 }
 
+// --- App setup ---
+const app = express();
+if (TRUST_PROXY) app.set('trust proxy', 1);
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public_html')));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+
 app.use(session({
+    store: new MemoryStore({ checkPeriod: 86400000 }),
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: {
-        secure: NODE_ENV === 'production' && process.env.TRUST_PROXY === 'true',
-        httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000
-    }
+    cookie: { httpOnly: true, secure: TRUST_PROXY, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// --- Health endpoints (Kubernetes probes) ---
-
-// Liveness probe: is the process alive? Lightweight, no dependency checks.
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime() });
-});
-
-// Readiness probe: are we ready to serve traffic? Tests the database.
-app.get('/ready', (req, res) => {
-    db.get('SELECT 1', (err) => {
-        if (err) {
-            return res.status(503).json({ status: 'not-ready', reason: 'database not reachable' });
-        }
-        res.json({ status: 'ready' });
-    });
-});
-
-// --- Pass session info to every rendered view ---
 app.use((req, res, next) => {
-    res.locals.isUserLoggedIn = !!(req.session && req.session.isUserLoggedIn);
-    res.locals.loggedInUsername = req.session ? req.session.username : null;
+    res.locals.isUserLoggedIn  = !!req.session.userId;
+    res.locals.currentUsername = req.session.username || null;
     next();
 });
 
-// --- Authentication middleware ---
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        log('info', { method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - start });
+    });
+    next();
+});
 
+// --- DB helpers ---
+const dbAll = (sql, params = []) => pool.query(sql, params).then(r => r.rows);
+const dbGet = (sql, params = []) => pool.query(sql, params).then(r => r.rows[0] || null);
+const dbRun = (sql, params = []) => pool.query(sql, params).then(r => ({ rowCount: r.rowCount }));
+
+// --- Auth middleware ---
 function requireLogin(req, res, next) {
-    if (req.session && req.session.isUserLoggedIn) {
-        return next();
-    }
-    res.redirect('/login');
+    if (!req.session.userId) return res.redirect('/login');
+    next();
 }
 
 // --- Routes ---
 
-// Home page
+// Liveness probe
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Readiness probe — check DB connectivity
+app.get('/ready', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ status: 'ready' });
+    } catch (err) {
+        res.status(503).json({ status: 'not ready', error: err.message });
+    }
+});
+
+// Home
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public_html', 'index.html'));
 });
 
-// --- User Registration ---
-
-app.get('/register', (req, res) => {
-    res.render('register', {
-        pageTitle: 'Register - EngliGo',
-        errors: [],
-        usernameValue: '',
-        emailValue: ''
-    });
-});
+// Register
+app.get('/register', (req, res) => res.render('register'));
 
 app.post('/register', async (req, res) => {
-    const { username, email, password, confirmPassword } = req.body;
-    let errors = [];
-
-    if (!username || username.trim().length < 3) {
-        errors.push({ msg: "Username must be at least 3 characters." });
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-        errors.push({ msg: "A valid email is required." });
-    }
-    if (!password || password.length < 6) {
-        errors.push({ msg: "Password must be at least 6 characters." });
-    }
-    if (password !== confirmPassword) {
-        errors.push({ msg: "Passwords do not match." });
-    }
-
-    if (errors.length > 0) {
-        return res.render('register', {
-            pageTitle: 'Register - EngliGo',
-            errors,
-            usernameValue: username || '',
-            emailValue: email || ''
-        });
-    }
-
+    const { username, email, password, confirm_password } = req.body;
+    if (!username || !email || !password)
+        return res.render('register', { error: 'All fields required.' });
+    if (password !== confirm_password)
+        return res.render('register', { error: 'Passwords do not match.' });
+    if (username.length < 3)
+        return res.render('register', { error: 'Username must be at least 3 characters.' });
+    if (password.length < 6)
+        return res.render('register', { error: 'Password must be at least 6 characters.' });
     try {
-        // Check for existing username/email
-        const existingUser = await new Promise((resolve, reject) => {
-            db.get(
-                'SELECT * FROM Users WHERE username = ? OR email = ?',
-                [username.trim(), email.trim()],
-                (err, row) => err ? reject(err) : resolve(row)
-            );
-        });
-
-        if (existingUser) {
-            if (existingUser.username === username.trim()) errors.push({ msg: "Username already taken." });
-            if (existingUser.email === email.trim()) errors.push({ msg: "Email already registered." });
-            return res.render('register', {
-                pageTitle: 'Register - EngliGo',
-                errors,
-                usernameValue: username,
-                emailValue: email
-            });
-        }
-
-        // Hash the password and insert the user
-        const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
-
-        await new Promise((resolve, reject) => {
-            db.run(
-                'INSERT INTO Users (username, email, password) VALUES (?, ?, ?)',
-                [username.trim(), email.trim(), hashedPassword],
-                function (err) { err ? reject(err) : resolve(this.lastID); }
-            );
-        });
-
+        const hash = await bcrypt.hash(password, 10);
+        await dbRun(
+            'INSERT INTO Users (username, email, password) VALUES ($1, $2, $3)',
+            [username, email, hash]
+        );
         res.redirect('/login?status=registered');
     } catch (err) {
-        console.error('Registration error:', err.message);
-        res.render('register', {
-            pageTitle: 'Register - EngliGo',
-            errors: [{ msg: "Could not register user. Please try again." }],
-            usernameValue: username || '',
-            emailValue: email || ''
-        });
+        if (err.code === '23505') // unique_violation
+            return res.render('register', { error: 'Username or email already exists.' });
+        log('error', { message: 'Registration failed', error: err.message });
+        res.status(500).render('register', { error: 'Registration failed. Please try again.' });
     }
 });
 
-// --- User Login ---
-
+// Login
 app.get('/login', (req, res) => {
-    let successMsg = null;
-    if (req.query.status === 'registered') {
-        successMsg = 'Registration successful! Please log in.';
-    }
     res.render('login', {
-        pageTitle: 'Login - EngliGo',
-        error: null,
-        success_msg: successMsg
+        message: req.query.status === 'registered' ? 'Registration successful! Please log in.' : null
     });
 });
 
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
-
-    if (!username || !password) {
-        return res.render('login', {
-            pageTitle: 'Login - EngliGo',
-            error: 'Username and password are required.',
-            success_msg: null
-        });
-    }
-
     try {
-        const user = await new Promise((resolve, reject) => {
-            db.get(
-                'SELECT * FROM Users WHERE username = ?',
-                [username.trim()],
-                (err, row) => err ? reject(err) : resolve(row)
-            );
-        });
+        const user = await dbGet('SELECT * FROM Users WHERE username = $1', [username]);
+        if (!user) return res.render('login', { error: 'Invalid credentials.' });
 
-        if (!user) {
-            return res.render('login', {
-                pageTitle: 'Login - EngliGo',
-                error: 'Invalid username or password.',
-                success_msg: null
-            });
-        }
-
-        // Detect bcrypt vs legacy plain-text and handle both
-        const isBcryptHash = typeof user.password === 'string' && user.password.startsWith('$2');
-        let passwordMatches = false;
-
-        if (isBcryptHash) {
-            passwordMatches = await bcrypt.compare(password, user.password);
+        let valid = false;
+        if (user.password.startsWith('$2')) {
+            valid = await bcrypt.compare(password, user.password);
         } else {
-            // Legacy plain-text comparison
-            passwordMatches = password === user.password;
-            // Upgrade their password to bcrypt now we know the plaintext
-            if (passwordMatches) {
-                const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
-                db.run('UPDATE Users SET password = ? WHERE id = ?', [hashed, user.id]);
-                console.log(`Upgraded password to bcrypt for user id ${user.id}`);
+            if (user.password === password) {
+                valid = true;
+                const newHash = await bcrypt.hash(password, 10);
+                await dbRun('UPDATE Users SET password = $1 WHERE id = $2', [newHash, user.id]);
+                log('info', { message: 'Upgraded legacy password to bcrypt', userId: user.id });
             }
         }
+        if (!valid) return res.render('login', { error: 'Invalid credentials.' });
 
-        if (passwordMatches) {
-            req.session.isUserLoggedIn = true;
-            req.session.userId = user.id;
-            req.session.username = user.username;
-            return res.redirect('/');
-        }
-
-        res.render('login', {
-            pageTitle: 'Login - EngliGo',
-            error: 'Invalid username or password.',
-            success_msg: null
-        });
-    } catch (err) {
-        console.error('Login error:', err.message);
-        res.render('login', {
-            pageTitle: 'Login - EngliGo',
-            error: 'Database error. Please try again.',
-            success_msg: null
-        });
-    }
-});
-
-// --- Logout ---
-
-app.get('/logout', (req, res) => {
-    req.session.destroy(err => {
-        if (err) return res.redirect('/');
-        res.clearCookie('connect.sid');
+        req.session.userId   = user.id;
+        req.session.username = user.username;
         res.redirect('/');
-    });
-});
-
-// --- Contact form submission ---
-
-app.post('/submit-contact', (req, res) => {
-    const { contactName, contactEmail, contactPhone, contactBirthdate, contactComment } = req.body;
-    let errors = [];
-
-    if (!contactName || contactName.trim() === "") {
-        errors.push("Name is required and cannot be empty.");
-    }
-    if (!contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
-        errors.push("A valid Email is required (e.g., user@example.com).");
-    }
-    if (!contactPhone || contactPhone.trim() === "" || !/^[0-9]{8,15}$/.test(contactPhone.trim())) {
-        errors.push("Phone number is required (8-15 digits, numbers only).");
-    }
-    if (!contactBirthdate || !/^\d{4}-\d{2}-\d{2}$/.test(contactBirthdate.trim())) {
-        errors.push("Birthdate in YYYY-MM-DD format is required.");
-    } else {
-        const [yearStr, monthStr, dayStr] = contactBirthdate.trim().split('-');
-        const year = parseInt(yearStr, 10);
-        const month = parseInt(monthStr, 10);
-        const day = parseInt(dayStr, 10);
-        const dateObj = new Date(year, month - 1, day);
-        if (!(dateObj.getFullYear() === year && dateObj.getMonth() === month - 1 && dateObj.getDate() === day)) {
-            errors.push("Invalid birthdate. Please enter a real calendar date.");
-        }
-    }
-    if (!contactComment || contactComment.trim() === "") {
-        errors.push("Comment is required and cannot be empty.");
-    }
-
-    if (errors.length > 0) {
-        return res.status(400).json({
-            message: "Validation failed. Please check your input.",
-            errors
-        });
-    }
-
-    db.run(
-        'INSERT INTO Submissions (name, email, phone, birthdate, comment) VALUES (?, ?, ?, ?, ?)',
-        [contactName.trim(), contactEmail.trim(), contactPhone.trim(), contactBirthdate.trim(), contactComment.trim()],
-        function (err) {
-            if (err) {
-                console.error('Database error saving submission:', err.message);
-                return res.status(500).json({
-                    message: "Error: Could not save your submission. Please try again later."
-                });
-            }
-            console.log(`A new submission has been inserted with rowid ${this.lastID}`);
-            res.status(201).json({
-                message: "Thank you for your submission! It has been received."
-            });
-        }
-    );
-});
-
-// --- learnSVG page ---
-app.get('/learnSvg', (req, res) => {
-    res.render('learnSvg', { pageTitle: 'Learn SVG Waves - EngliGo' });
-});
-
-// --- Admin: view submitted messages (login required) ---
-app.get('/admin/messages', requireLogin, async (req, res) => {
-    try {
-        const getAll = (sql, params = []) => new Promise((resolve, reject) => {
-            db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
-        });
-
-        const [submissions, users] = await Promise.all([
-            getAll('SELECT id, name, email, phone, birthdate, comment, submission_date FROM Submissions ORDER BY submission_date DESC'),
-            getAll('SELECT id, username, email FROM Users ORDER BY username ASC')
-        ]);
-
-        res.render('admin_messages', {
-            pageTitle: 'Site Data Overview - EngliGo',
-            submissions,
-            users,
-            loggedInUsername: req.session.username
-        });
     } catch (err) {
-        console.error('Admin route error:', err.message);
-        res.status(500).send("Error retrieving data from the database.");
+        log('error', { message: 'Login failed', error: err.message });
+        res.status(500).render('login', { error: 'Login failed. Please try again.' });
     }
 });
 
-// --- Class Bookings ---
+// Logout
+app.get('/logout', (req, res) => req.session.destroy(() => res.redirect('/')));
 
-// List all upcoming classes (across all courses)
-app.get('/classes', (req, res) => {
-    const now = new Date().toISOString();
-    const sql = `
-        SELECT
-            cs.id, cs.title, cs.teacher_name, cs.location, cs.start_time,
-            cs.duration_minutes, cs.capacity,
-            c.code AS course_code, c.name AS course_name,
-            (SELECT COUNT(*) FROM Bookings WHERE session_id = cs.id) AS booked_count
-        FROM ClassSessions cs
-        JOIN Courses c ON cs.course_id = c.id
-        WHERE cs.start_time > ?
-        ORDER BY cs.start_time ASC
-    `;
-
-    db.all(sql, [now], (err, sessions) => {
-        if (err) {
-            console.error('Error fetching classes:', err.message);
-            return res.status(500).send('Error loading classes.');
-        }
-        res.render('classes', {
-            pageTitle: 'Available Classes - EngliGo',
-            sessions,
-            isLoggedIn: !!(req.session && req.session.isUserLoggedIn)
-        });
-    });
-});
-
-// List classes for a specific course
-app.get('/classes/:code', (req, res) => {
-    const courseCode = req.params.code;
-    const now = new Date().toISOString();
-    const sql = `
-        SELECT
-            cs.id, cs.title, cs.teacher_name, cs.location, cs.start_time,
-            cs.duration_minutes, cs.capacity,
-            c.code AS course_code, c.name AS course_name, c.description AS course_description,
-            (SELECT COUNT(*) FROM Bookings WHERE session_id = cs.id) AS booked_count
-        FROM ClassSessions cs
-        JOIN Courses c ON cs.course_id = c.id
-        WHERE c.code = ? AND cs.start_time > ?
-        ORDER BY cs.start_time ASC
-    `;
-
-    db.all(sql, [courseCode, now], (err, sessions) => {
-        if (err) {
-            console.error('Error fetching course classes:', err.message);
-            return res.status(500).send('Error loading course classes.');
-        }
-        if (sessions.length === 0) {
-            // Either course doesn't exist or has no upcoming sessions; check which
-            db.get('SELECT * FROM Courses WHERE code = ?', [courseCode], (err, course) => {
-                if (err || !course) return res.status(404).send('Course not found.');
-                return res.render('course-classes', {
-                    pageTitle: `${course.name} - EngliGo`,
-                    course,
-                    sessions: [],
-                    isLoggedIn: !!(req.session && req.session.isUserLoggedIn)
-                });
-            });
-            return;
-        }
-        // We have sessions; pull course info from first row
-        const course = {
-            code: sessions[0].course_code,
-            name: sessions[0].course_name,
-            description: sessions[0].course_description
-        };
-        res.render('course-classes', {
-            pageTitle: `${course.name} - EngliGo`,
-            course,
-            sessions,
-            isLoggedIn: !!(req.session && req.session.isUserLoggedIn)
-        });
-    });
-});
-
-// Book a class session (login required)
-app.post('/bookings', requireLogin, async (req, res) => {
-    const sessionId = parseInt(req.body.session_id, 10);
-    const userId = req.session.userId;
-
-    if (Number.isNaN(sessionId)) {
-        return res.redirect('/classes?error=invalid-session');
-    }
-
+// Classes
+app.get('/classes', async (req, res) => {
     try {
-        await new Promise((resolve, reject) => {
-            db.run(
-                'INSERT INTO Bookings (user_id, session_id) VALUES (?, ?)',
-                [userId, sessionId],
-                function (err) { err ? reject(err) : resolve(this.lastID); }
-            );
-        });
+        const sessions = await dbAll(`
+            SELECT s.*, c.code AS course_code, c.name AS course_name,
+                   (SELECT COUNT(*) FROM Bookings WHERE session_id = s.id)::int AS booked_count
+            FROM ClassSessions s
+            JOIN Courses c ON c.id = s.course_id
+            WHERE s.session_date >= CURRENT_DATE
+            ORDER BY s.session_date, s.start_time
+        `);
+        res.render('classes', { sessions });
+    } catch (err) {
+        log('error', { message: 'Failed to load classes', error: err.message });
+        res.status(500).send('Internal server error');
+    }
+});
+
+// Book a class
+app.post('/classes/:sessionId/book', requireLogin, async (req, res) => {
+    const sessionId = parseInt(req.params.sessionId, 10);
+    try {
+        await dbRun(
+            'INSERT INTO Bookings (user_id, session_id) VALUES ($1, $2)',
+            [req.session.userId, sessionId]
+        );
         res.redirect('/my-bookings?status=booked');
     } catch (err) {
-        if (err.message && err.message.includes('UNIQUE constraint failed')) {
+        if (err.code === '23505')
             return res.redirect('/my-bookings?error=already-booked');
-        }
-        if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-            return res.redirect('/classes?error=invalid-session');
-        }
-        console.error('Booking error:', err.message);
-        res.redirect('/classes?error=booking-failed');
+        log('error', { message: 'Booking failed', error: err.message });
+        res.redirect('/my-bookings?error=booking-failed');
     }
 });
 
-// Cancel a booking (login required, must own the booking)
-app.post('/bookings/:id/cancel', requireLogin, (req, res) => {
-    const bookingId = parseInt(req.params.id, 10);
-    const userId = req.session.userId;
-
-    if (Number.isNaN(bookingId)) {
-        return res.redirect('/my-bookings?error=invalid-booking');
+// My bookings
+app.get('/my-bookings', requireLogin, async (req, res) => {
+    try {
+        const bookings = await dbAll(`
+            SELECT b.id AS booking_id, b.booked_at, s.*, c.code AS course_code, c.name AS course_name
+            FROM Bookings b
+            JOIN ClassSessions s ON s.id = b.session_id
+            JOIN Courses c ON c.id = s.course_id
+            WHERE b.user_id = $1
+            ORDER BY s.session_date, s.start_time
+        `, [req.session.userId]);
+        res.render('my-bookings', { bookings, status: req.query.status, error: req.query.error });
+    } catch (err) {
+        log('error', { message: 'Failed to load bookings', error: err.message });
+        res.status(500).send('Internal server error');
     }
-
-    db.run(
-        'DELETE FROM Bookings WHERE id = ? AND user_id = ?',
-        [bookingId, userId],
-        function (err) {
-            if (err) {
-                console.error('Cancel booking error:', err.message);
-                return res.redirect('/my-bookings?error=cancel-failed');
-            }
-            if (this.changes === 0) {
-                // Either the booking doesn't exist, or it belongs to someone else
-                return res.redirect('/my-bookings?error=not-found');
-            }
-            res.redirect('/my-bookings?status=cancelled');
-        }
-    );
 });
 
-// View own bookings (login required)
-app.get('/my-bookings', requireLogin, (req, res) => {
-    const userId = req.session.userId;
-    const sql = `
-        SELECT
-            b.id AS booking_id, b.booked_at,
-            cs.id AS session_id, cs.title, cs.teacher_name, cs.location,
-            cs.start_time, cs.duration_minutes,
-            c.name AS course_name, c.code AS course_code
-        FROM Bookings b
-        JOIN ClassSessions cs ON b.session_id = cs.id
-        JOIN Courses c ON cs.course_id = c.id
-        WHERE b.user_id = ?
-        ORDER BY cs.start_time ASC
-    `;
-
-    db.all(sql, [userId], (err, bookings) => {
-        if (err) {
-            console.error('My bookings error:', err.message);
-            return res.status(500).send('Error loading bookings.');
-        }
-        res.render('my-bookings', {
-            pageTitle: 'My Bookings - EngliGo',
-            bookings,
-            statusMessage: req.query.status || null,
-            errorMessage: req.query.error || null
-        });
-    });
+// Cancel booking
+app.post('/bookings/:bookingId/cancel', requireLogin, async (req, res) => {
+    const bookingId = parseInt(req.params.bookingId, 10);
+    try {
+        await dbRun('DELETE FROM Bookings WHERE id = $1 AND user_id = $2', [bookingId, req.session.userId]);
+        res.redirect('/my-bookings?status=cancelled');
+    } catch (err) {
+        log('error', { message: 'Cancel failed', error: err.message });
+        res.redirect('/my-bookings?error=cancel-failed');
+    }
 });
 
-// --- 404 handler (must be after all routes) ---
-app.use((req, res) => {
-    res.status(404).send('Page not found');
+// Contact form
+app.post('/contact', async (req, res) => {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !message) return res.status(400).send('Required fields missing.');
+    try {
+        await dbRun(
+            'INSERT INTO Submissions (name, email, subject, message) VALUES ($1, $2, $3, $4)',
+            [name, email, subject || null, message]
+        );
+        res.send('Thank you for your message. We will be in touch.');
+    } catch (err) {
+        log('error', { message: 'Contact submission failed', error: err.message });
+        res.status(500).send('Submission failed. Please try again.');
+    }
 });
 
-// --- Error handler (must be last) ---
-app.use((err, req, res, next) => {
-    console.error(JSON.stringify({
-        ts: new Date().toISOString(),
-        level: 'error',
-        message: err.message,
-        stack: err.stack,
-        path: req.path
-    }));
-    res.status(500).send('Internal server error');
+// Admin
+app.get('/admin/messages', requireLogin, async (req, res) => {
+    try {
+        const submissions = await dbAll('SELECT * FROM Submissions ORDER BY timestamp DESC');
+        const users       = await dbAll('SELECT id, username, email, created_at FROM Users ORDER BY created_at DESC');
+        res.render('admin_messages', { submissions, users });
+    } catch (err) {
+        log('error', { message: 'Admin page failed', error: err.message });
+        res.status(500).send('Internal server error');
+    }
 });
 
 // --- Start server ---
 const server = app.listen(PORT, () => {
-    console.log(`Web server running at: http://localhost:${PORT}`);
-    console.log(`Environment: ${NODE_ENV}`);
-    console.log(`Database: ${DB_PATH}`);
+    log('info', { message: `EngliGo listening on port ${PORT}`, env: NODE_ENV });
 });
 
-// --- Graceful shutdown for Kubernetes rolling updates ---
-const shutdown = (signal) => {
-    console.log(JSON.stringify({
-        ts: new Date().toISOString(),
-        level: 'info',
-        message: `${signal} received, shutting down gracefully`
-    }));
-    server.close(() => {
-        db.close((err) => {
-            if (err) console.error('Error closing database:', err.message);
-            process.exit(err ? 1 : 0);
-        });
+// --- Graceful shutdown ---
+function shutdown(signal) {
+    log('info', { message: `${signal} received, shutting down` });
+    server.close(async () => {
+        await pool.end();
+        process.exit(0);
     });
-    setTimeout(() => {
-        console.error('Forced shutdown after timeout');
-        process.exit(1);
-    }, 10000).unref();
-};
-
+    setTimeout(() => { log('error', { message: 'Forced shutdown' }); process.exit(1); }, 10000);
+}
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGINT',  () => shutdown('SIGINT'));

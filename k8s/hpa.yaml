@@ -1,22 +1,3 @@
-# ============================================================================
-# EngliGo HorizontalPodAutoscaler (Stage 2)
-# ----------------------------------------------------------------------------
-# Scaffolds CPU-based horizontal autoscaling for the engligo Deployment.
-#
-# IMPORTANT: maxReplicas is currently capped at 1 because the persistence
-# layer (SQLite-on-PVC with ReadWriteOnce access mode) cannot support
-# multiple concurrent writers. The HPA architecture is present and
-# observable via `kubectl get hpa`, but cannot scale beyond 1 in Stage 2.
-#
-# Stage 3 path: migrate to Cloud SQL (PostgreSQL), then change maxReplicas
-# from 1 to 5 (or higher) - a single-line YAML change that unlocks real
-# horizontal scaling without any other architectural rework.
-#
-# Why scaffold now: demonstrates the cloud-native principle of designing
-# for elasticity (CNCF horizontal scaling pattern) even when current state
-# does not require it, and makes the Stage 3 migration trivial.
-# ============================================================================
-
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -29,7 +10,10 @@ spec:
     kind: Deployment
     name: engligo
   minReplicas: 1
-  maxReplicas: 1    
+  # Stage 3: maxReplicas raised from 1 to 3.
+  # SQLite single-writer constraint removed — PostgreSQL sidecar supports
+  # concurrent connections from multiple pods.
+  maxReplicas: 3
   metrics:
     - type: Resource
       resource:

@@ -5,11 +5,15 @@ metadata:
   labels:
     app: engligo
 spec:
-  # Single replica because PVC is ReadWriteOnce (SQLite single-writer).
-  # Stage 3: migrate to Cloud SQL for horizontal scaling.
+  # Stage 3: SQLite replaced by PostgreSQL sidecar.
+  # ReadWriteOnce PVC constraint removed — RollingUpdate now safe.
+  # HPA can scale beyond 1 replica.
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: engligo
@@ -22,7 +26,35 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+
+      # ----------------------------------------------------------------
+      # initContainer: runs database_init.js once before app starts.
+      # Waits for the postgres sidecar, then creates schema + seeds data.
+      # ----------------------------------------------------------------
+      initContainers:
+        - name: db-init
+          image: ghcr.io/aaronalijani/engligo-cloud:latest
+          imagePullPolicy: Always
+          command: ["node", "database_init.js"]
+          env:
+            - name: PG_HOST
+              value: "localhost"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              value: "engligo"
+            - name: PG_USER
+              value: "engligo"
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: engligo-secrets
+                  key: PG_PASSWORD
+
       containers:
+        # ----------------------------------------------------------------
+        # Main app container
+        # ----------------------------------------------------------------
         - name: engligo
           image: ghcr.io/aaronalijani/engligo-cloud:latest
           imagePullPolicy: Always
@@ -34,8 +66,6 @@ spec:
               value: "3000"
             - name: NODE_ENV
               value: "production"
-            - name: DB_PATH
-              value: "/data/engligo.db"
             - name: TRUST_PROXY
               value: "true"
             - name: SESSION_SECRET
@@ -43,9 +73,19 @@ spec:
                 secretKeyRef:
                   name: engligo-secrets
                   key: SESSION_SECRET
-          volumeMounts:
-            - name: engligo-data
-              mountPath: /data
+            - name: PG_HOST
+              value: "localhost"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              value: "engligo"
+            - name: PG_USER
+              value: "engligo"
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: engligo-secrets
+                  key: PG_PASSWORD
           resources:
             requests:
               cpu: "100m"
@@ -54,16 +94,11 @@ spec:
               cpu: "500m"
               memory: "256Mi"
           # ============================================================
-          # Stage 2 probe tuning:
-          # - startupProbe (NEW) handles cold-start window: tolerates up
-          #   to ~60s for cold image pulls (~9s) + Node.js + SQLite init
-          #   (~3s). Disables liveness/readiness until app is up.
-          # - livenessProbe TIGHTENED: periodSeconds 20 -> 10 detects
-          #   crashes ~2x faster after startup completes.
-          # - readinessProbe TIGHTENED: periodSeconds 10 -> 5 pulls a
-          #   failing pod out of the LoadBalancer rotation faster.
-          # All values are based on measured timings captured via
-          # `kubectl get events` during pod restarts.
+          # Stage 3 probe tuning (inherited from Stage 2 + adjusted):
+          # - startupProbe: PostgreSQL sidecar adds ~5-10s to startup.
+          #   60-second window is still sufficient.
+          # - livenessProbe: 10s period (Stage 2 tuned value retained).
+          # - readinessProbe: 5s period (Stage 2 tuned value retained).
           # ============================================================
           startupProbe:
             httpGet:
@@ -85,7 +120,48 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
+
+        # ----------------------------------------------------------------
+        # PostgreSQL sidecar
+        # Shares localhost network with app container.
+        # emptyDir volume provides ephemeral storage (resets on pod restart).
+        # Note: for production, replace with Cloud SQL.
+        # ----------------------------------------------------------------
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: "engligo"
+            - name: POSTGRES_USER
+              value: "engligo"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: engligo-secrets
+                  key: PG_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "engligo", "-d", "engligo"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 10
+
       volumes:
-        - name: engligo-data
-          persistentVolumeClaim:
-            claimName: engligo-data-pvc
+        # emptyDir: ephemeral — data resets on pod restart.
+        # Sufficient for demo; Cloud SQL provides persistence in production.
+        - name: pg-data
+          emptyDir: {}
