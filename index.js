@@ -184,7 +184,7 @@ app.get('/classes', async (req, res) => {
             WHERE s.session_date >= CURRENT_DATE
             ORDER BY s.session_date, s.start_time
         `);
-        res.render('classes', { sessions });
+        res.render('classes', { sessions, pageTitle: 'Available Classes' });
     } catch (err) {
         log('error', { message: 'Failed to load classes', error: err.message });
         res.status(500).send('Internal server error');
