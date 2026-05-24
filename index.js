@@ -266,19 +266,115 @@ app.get('/admin/messages', requireLogin, async (req, res) => {
     }
 });
 
-// --- Start server ---
-const server = app.listen(PORT, () => {
-    log('info', { message: `EngliGo listening on port ${PORT}`, env: NODE_ENV });
-});
+// --- Start server (with inline DB init) ---
+async function startServer() {
+    // Wait for PostgreSQL sidecar to be ready, then init schema
+    log('info', { message: 'Waiting for PostgreSQL...' });
+    for (let i = 1; i <= 30; i++) {
+        try {
+            await pool.query('SELECT 1');
+            log('info', { message: 'PostgreSQL ready' });
+            break;
+        } catch (err) {
+            if (i === 30) {
+                log('error', { message: 'PostgreSQL never became ready', error: err.message });
+                process.exit(1);
+            }
+            log('info', { message: `Waiting for PostgreSQL... attempt ${i}/30` });
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
 
-// --- Graceful shutdown ---
-function shutdown(signal) {
-    log('info', { message: `${signal} received, shutting down` });
-    server.close(async () => {
-        await pool.end();
-        process.exit(0);
+    // Run schema + seed (idempotent — safe to run every startup)
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS Submissions (
+                id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL,
+                subject TEXT, message TEXT NOT NULL, timestamp TIMESTAMPTZ DEFAULT NOW()
+            )`);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS Users (
+                id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )`);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS Courses (
+                id SERIAL PRIMARY KEY, code TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL, description TEXT
+            )`);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS ClassSessions (
+                id SERIAL PRIMARY KEY,
+                course_id INTEGER NOT NULL REFERENCES Courses(id) ON DELETE CASCADE,
+                title TEXT NOT NULL, instructor TEXT NOT NULL, location TEXT NOT NULL,
+                session_date DATE NOT NULL, start_time TIME NOT NULL,
+                duration_minutes INTEGER NOT NULL, capacity INTEGER NOT NULL DEFAULT 10
+            )`);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS Bookings (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+                session_id INTEGER NOT NULL REFERENCES ClassSessions(id) ON DELETE CASCADE,
+                booked_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE (user_id, session_id)
+            )`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_user    ON Bookings(user_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_bookings_session ON Bookings(session_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_course  ON ClassSessions(course_id)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_sessions_date    ON ClassSessions(session_date)`);
+
+        await client.query(`
+            INSERT INTO Courses (code, name, description) VALUES
+              ('IELTS-PREP','IELTS Preparation','Comprehensive preparation for the IELTS Academic test, covering all four bands.'),
+              ('GEN-ENG','General English','Conversational and grammar-focused General English for everyday communication.')
+            ON CONFLICT (code) DO NOTHING`);
+
+        const { rows } = await client.query('SELECT COUNT(*)::int AS count FROM ClassSessions');
+        if (rows[0].count === 0) {
+            const now = new Date();
+            const d = (days) => { const x = new Date(now); x.setDate(x.getDate()+days); return x.toISOString().slice(0,10); };
+            const sessions = [
+                { code:'IELTS-PREP', title:'IELTS Speaking Practice',  instructor:'Ms Sarah Chen', location:'Room 201',      date:d(7),  time:'10:00', dur:90,  cap:12 },
+                { code:'GEN-ENG',    title:'Conversation Club',         instructor:'Mr Liam Brown', location:'Online (Zoom)', date:d(8),  time:'18:00', dur:60,  cap:15 },
+                { code:'IELTS-PREP', title:'IELTS Writing Workshop',    instructor:'Mr David Park', location:'Room 105',      date:d(9),  time:'14:00', dur:120, cap:10 },
+                { code:'GEN-ENG',    title:'Grammar Essentials',        instructor:'Ms Anna Lee',   location:'Room 102',      date:d(10), time:'11:00', dur:60,  cap:12 },
+                { code:'IELTS-PREP', title:'IELTS Mock Test',           instructor:'Ms Sarah Chen', location:'Room 201',      date:d(12), time:'09:00', dur:180, cap:20 },
+                { code:'GEN-ENG',    title:'Vocabulary Builder',        instructor:'Mr Liam Brown', location:'Room 102',      date:d(13), time:'16:00', dur:60,  cap:12 },
+            ];
+            for (const s of sessions) {
+                await client.query(`
+                    INSERT INTO ClassSessions
+                        (course_id,title,instructor,location,session_date,start_time,duration_minutes,capacity)
+                    SELECT id,$1,$2,$3,$4,$5,$6,$7 FROM Courses WHERE code=$8`,
+                    [s.title,s.instructor,s.location,s.date,s.time,s.dur,s.cap,s.code]);
+            }
+            log('info', { message: `Seeded ${sessions.length} class sessions` });
+        }
+        log('info', { message: 'Database schema ready' });
+    } finally {
+        client.release();
+    }
+
+    // Start HTTP server
+    const server = app.listen(PORT, () => {
+        log('info', { message: `EngliGo listening on port ${PORT}`, env: NODE_ENV });
     });
-    setTimeout(() => { log('error', { message: 'Forced shutdown' }); process.exit(1); }, 10000);
+
+    function shutdown(signal) {
+        log('info', { message: `${signal} received, shutting down` });
+        server.close(async () => {
+            await pool.end();
+            process.exit(0);
+        });
+        setTimeout(() => { log('error', { message: 'Forced shutdown' }); process.exit(1); }, 10000);
+    }
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+
+startServer().catch(err => {
+    log('error', { message: 'Failed to start server', error: err.message });
+    process.exit(1);
+});
